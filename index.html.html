@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة المستودع والمبيعات - مسك السكن</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background-color: #f4f7f6; color: #333; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1, h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, button { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+        button { background-color: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; margin-top: 10px; }
+        button:hover { background-color: #219150; }
+        .hidden { display: none; }
+        .dashboard { margin-top: 20px; }
+        .user-info { background: #eef2f5; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .logout-btn { width: auto; background-color: #e74c3c; padding: 8px 15px; }
+        .logout-btn:hover { background-color: #c0392b; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #34495e; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- صفحة تسجيل الدخول -->
+    <div id="login-section">
+        <h1>مسك السكن - تسجيل الدخول</h1>
+        <form id="login-form">
+            <div class="form-group">
+                <label>اسم المستخدم / الحساب:</label>
+                <select id="username" required>
+                    <option value="">اختر الحساب...</option>
+                    <option value="admin">👤 المسؤول الرئيسي (الأدمن)</option>
+                    <option value="storekeeper">🛠️ مصدر الصرف / أمين المستودع</option>
+                    <option value="ahmed">👨‍💼 أحمد جابر (مندوب)</option>
+                    <option value="mohammed">👨‍💼 محمد عسيري (مندوب)</option>
+                    <option value="khaled">👨‍💼 خالد يحيى (مندوب)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>الرمز السرّي:</label>
+                <input type="password" id="password" placeholder="أدخل الرقم السري" required>
+            </div>
+            <button type="submit">تسجيل الدخول</button>
+        </form>
+    </div>
+
+    <!-- لوحة التحكم بعد تسجيل الدخول -->
+    <div id="dashboard-section" class="hidden">
+        <div class="user-info">
+            <div>أهلاً بك: <strong id="current-user-name"></strong></div>
+            <button class="logout-btn" onclick="logout()">تسجيل الخروج</button>
+        </div>
+
+        <div id="admin-panel" class="dashboard hidden">
+            <h2>لوحة إدارة المناديب والحسابات</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>الحساب</th>
+                        <th>الرمز السري الحالي</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body">
+                    <!-- يتم تعبئته ديناميكياً -->
+                </tbody>
+            </table>
+        </div>
+
+        <div id="general-panel" class="dashboard hidden">
+            <h2>مرحباً بك في نظام المستودعات والمبيعات</h2>
+            <p style="text-align: center; color: #7f8c8d; margin-top: 20px;">تم تسجيل الدخول بنجاح للنظام السحابي الخاص بشركة مسك السكن.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // مصفوفة الحسابات والأرقام السرية الافتراضية
+    let internalUsers = [
+        { id: "admin", name: "👤 المسؤول الرئيسي (الأدمن)", role: "admin", pass: "admin123" },
+        { id: "storekeeper", name: "🛠️ مصدر الصرف / أمين المستودع", role: "storekeeper", pass: "store123" },
+        { id: "ahmed", name: "👨‍💼 أحمد جابر (مندوب)", role: "sales", pass: "ahmed123" },
+        { id: "mohammed", name: "👨‍💼 محمد عسيري (مندوب)", role: "sales", pass: "mohammed123" },
+        { id: "khaled", name: "👨‍💼 خالد يحيى (مندوب)", role: "sales", pass: "khaled123" }
+    ];
+
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const userVal = document.getElementById('username').value;
+        const passVal = document.getElementById('password').value;
+
+        const user = internalUsers.find(u => u.id === userVal);
+
+        if (user && user.pass === passVal) {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.remove('hidden');
+            document.getElementById('current-user-name').textContent = user.name;
+
+            if (user.role === 'admin') {
+                document.getElementById('admin-panel').classList.remove('hidden');
+                renderUsersTable();
+            } else {
+                document.getElementById('general-panel').classList.remove('hidden');
+            }
+        } else {
+            alert('الرقم السري غير صحيح، يرجى المحاولة مرة أخرى.');
+        }
+    });
+
+    function renderUsersTable() {
+        const tbody = document.getElementById('users-table-body');
+        tbody.innerHTML = '';
+        internalUsers.forEach(u => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${u.name}</td><td><code>${u.pass}</code></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function logout() {
+        document.getElementById('password').value = '';
+        document.getElementById('dashboard-section').classList.add('hidden');
+        document.getElementById('admin-panel').classList.add('hidden');
+        document.getElementById('general-panel').classList.add('hidden');
+        document.getElementById('login-section').classList.remove('hidden');
+    }
+</script>
+
+</body>
+</html>
