@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام MSSK لإدارة المستودعات والعملاء - v9.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @keyframes pulse-light {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .animate-pulse-light { animation: pulse-light 2s infinite; }
+        @media print {
+            body > div:not(#printArea) { display: none !important; }
+            #printArea { display: block !important; width: 100%; direction: rtl; padding: 10px; }
+            .no-print { display: none !important; }
+            table { width: 100% !important; border-collapse: collapse !important; border: 1px solid #000 !important; }
+            th, td { border: 1px solid #000 !important; padding: 8px !important; text-align: right !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-5xl text-gray-800 font-sans">
+
+    <!-- [1] شاشة تسجيل الدخول المحمية -->
+    <div id="loginScreen" class="fixed inset-0 bg-slate-900 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full border border-gray-100">
+            <div class="text-center mb-6">
+                <h1 class="text-3xl font-black text-amber-500 tracking-wider">MSSK DOORS</h1>
+                <p class="text-xs text-gray-500 mt-1 font-bold">بوابة تسجيل الدخول الموحدة | الإصدار v9.0</p>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">اختر الحساب / الصفة الوظيفية</label>
+                    <select id="loginRoleSelect" onchange="handleLoginRoleChange()" class="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 font-medium">
+                        <!-- يتم التحديث تلقائياً من مصفوفة الحسابات -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">كلمة المرور السرية</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" class="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 text-left font-mono">
+                </div>
+                <button onclick="attemptLogin()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold p-3 rounded-xl transition cursor-pointer shadow-md">
+                    🔓 تسجيل الدخول الآمن
+                </button>
+                <p id="loginError" class="text-xs text-red-600 font-bold text-center hidden">❌ كلمة المرور غير صحيحة، يرجى المحاولة مرة أخرى!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- [2] واجهة النظام الرئيسية -->
+    <div id="systemInterface" class="hidden h-screen overflow-hidden flex">
+        <!-- الشريط الجانبي (Sidebar) -->
+        <div class="w-64 bg-slate-900 text-white flex flex-col shadow-xl shrink-0 z-10 no-print">
+            <div class="p-5 text-center border-b border-slate-800">
+                <div id="sidebarLogoContainer" class="mb-2 hidden justify-center">
+                    <img id="sidebarLogo" src="" class="h-14 w-auto object-contain rounded-lg border border-slate-700 p-1 bg-white">
+                </div>
+                <h1 class="text-2xl font-black tracking-wider text-amber-500">MSSK DOORS</h1>
+                <p id="userBadgeSide" class="text-xs bg-amber-600/20 text-amber-400 font-bold px-2 py-0.5 rounded-sm mt-1 inline-block"></p>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <button onclick="scrollToSection('dashboard')" id="sideBtnDash" class="w-full flex items-center space-x-3 space-x-reverse p-3 rounded-lg bg-amber-600 text-white font-medium text-right cursor-pointer">
+                    <span class="text-lg">📊</span> <span>لوحة التحكم</span>
+                </button>
+                <button onclick="scrollToSection('products-section')" id="sideBtnProd" class="w-full flex items-center space-x-3 space-x-reverse p-3 rounded-lg text-slate-300 hover:bg-slate-800 transition text-right cursor-pointer">
+                    <span class="text-lg">📦</span> <span>صندوق الأصناف</span>
+                </button>
+                <button onclick="scrollToSection('users-admin-section')" id="sideBtnAgents" class="w-full flex items-center space-x-3 space-x-reverse p-3 rounded-lg text-slate-300 hover:bg-slate-800 transition text-right cursor-pointer">
+                    <span class="text-lg">⚙️</span> <span>إدارة المناديب والحسابات</span>
+                </button>
+                <button onclick="scrollToSection('customers-section')" id="sideBtnCust" class="w-full flex items-center space-x-3 space-x-reverse p-3 rounded-lg text-slate-300 hover:bg-slate-800 transition text-right cursor-pointer">
+                    <span class="text-lg">👥</span> <span>إدارة العملاء</span>
+                </button>
+                <button onclick="scrollToSection('slips-section')" id="sideBtnSlips" class="w-full flex items-center space-x-3 space-x-reverse p-3 rounded-lg text-slate-300 hover:bg-slate-800 transition text-right cursor-pointer">
+                    <span class="text-lg">📄</span> <span>سندات الصرف</span>
+                </button>
+            </nav>
+            <div class="p-4 border-t border-slate-800 flex flex-col gap-2">
+                <button onclick="logoutSystem()" class="w-full bg-red-900/40 text-red-300 hover:bg-red-900 text-xs font-bold p-2 rounded-lg transition cursor-pointer">🚪 تسجيل الخروج</button>
+                <div class="text-center text-[10px] text-slate-500">النسخة المعتمدة v9.0 المثالية</div>
+            </div>
+        </div>
+
+        <!-- المحتوى الرئيسي (Main Content) -->
+        <div id="mainContainer" class="flex-1 flex flex-col overflow-y-auto scroll-smooth">
+            <header class="bg-white shadow-md p-4 flex flex-col lg:flex-row justify-between items-center px-8 border-b border-gray-200 sticky top-0 z-50 no-print gap-4">
+                <div class="flex items-center space-x-3 space-x-reverse">
+                    <div id="headerLogoContainer" class="hidden">
+                        <img id="headerLogo" src="" class="h-10 w-auto object-contain rounded-md border border-gray-200">
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+                            <span>🚪</span> شركة مسك السكن للتجارة <span class="text-xs font-bold bg-amber-500 text-white px-2 py-0.5 rounded-sm">MSSK Doors</span>
+                        </h2>
+                        <p class="text-xs text-gray-500 font-medium">مرحباً بك: <span id="currentUserNameLabel" class="font-bold text-slate-900"></span></p>
+                    </div>
+                </div>
+
+                <div id="logoUploadBox" class="flex items-center gap-2 bg-amber-50 p-2 rounded-xl border border-amber-200">
+                    <label class="text-xs font-bold text-amber-900 cursor-pointer flex items-center gap-1">
+                        🖼️ شعار الشركة:
+                        <input type="file" id="companyLogoInput" onchange="loadCompanyLogo(event)" class="hidden" accept="image/*">
+                        <span class="bg-amber-600 text-white px-2 py-1 rounded-md text-[10px] hover:bg-amber-700">اختر صورة</span>
+                    </label>
+                </div>
+            </header>
+
+            <main class="p-8 space-y-8 relative z-0">
+                <!-- الإحصائيات -->
+                <div id="dashboard" class="grid grid-cols-1 md:grid-cols-3 gap-6 no-print">
+                    <div class="bg-white p-6 rounded-xl shadow-xs border border-gray-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-400">إجمالي الأصناف بالمخزن</p>
+                            <h3 id="totalProductsCount" class="text-2xl font-bold mt-1 text-slate-800">0 صنف</h3>
+                        </div>
+                        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg text-xl">📦</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-xs border border-gray-100 flex items-center justify-between">
+                        <div>
+                            <p id="customerCardTitle" class="text-sm font-medium text-gray-400">إجمالي العملاء</p>
+                            <h3 id="totalCustomersCount" class="text-2xl font-bold mt-1 text-emerald-600">0 عميل</h3>
+                        </div>
+                        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg text-xl">👥</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-xs border border-gray-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-400">سندات الصرف الصادرة</p>
+                            <h3 id="totalSlipsCount" class="text-2xl font-bold mt-1 text-amber-600">0 سند</h3>
+                        </div>
+                        <div class="p-3 bg-amber-50 text-amber-600 rounded-lg text-xl">📤</div>
+                    </div>
+                </div>
+
+                <div id="installationAlertsContainer" class="hidden space-y-2 no-print"></div>
+
+                <!-- لوحة الإدارة والتحكم الكاملة (المستخدمين والأرقام السرية) -->
+                <div id="usersAdminBlock" class="bg-white p-6 rounded-xl shadow-xs border border-gray-100 no-print">
+                    <div id="users-admin-section" class="flex items-center space-x-2 space-x-reverse mb-4 border-b border-gray-50 pb-3">
+                        <span class="text-lg">⚙️</span>
+                        <h3 class="text-lg font-bold text-gray-700">لوحة الإشراف، إدارة الصلاحيات وتعديل الأرقام السرية (v9.0)</h3>
+                    </div>
+                    <div id="addUserFormBox" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-6 bg-slate-50 p-4 rounded-xl border border-gray-200">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">اسم الحساب / المندوب الجديد *</label>
+                            <input type="text" id="newUserName" placeholder="مثال: صالح علي" class="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:outline-hidden">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">الرقم السري للـدخول *</label>
+                            <input type="text" id="newUserPass" placeholder="كلمة المرور" class="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:outline-hidden">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">الصفة الوظيفية الصلاحية *</label>
+                            <select id="newUserRole" class="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:outline-hidden">
+                                <option value="agent">👔 مندوب مبيعات ميداني</option>
+                                <option value="storekeeper">🛠️ أمين مستودع (مصدر سندات)</option>
+                                <option value="sub_admin">🔑 أدمن مساعد (صلاحيات محدودة)</option>
+                            </select>
+                        </div>
+                        <button type="button" onclick="addNewUserFromAdmin()" class="bg-emerald-600 text-white font-bold py-2.5 rounded-lg hover:bg-emerald-700 cursor-pointer">➕ إضافة ومنح الصلاحية</button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 text-sm font-bold border-b border-gray-100">
+                                    <th class="p-4">اسم المستخدم</th>
+                                    <th class="p-4">الصلاحية</th>
+                                    <th class="p-4">الرقم السري الحالي</th>
+                                    <th class="p-4 text-center">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersAdminTableBody" class="text-sm divide-y divide-gray-50">
+                                <!-- يتم البناء ديناميكياً -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- نموذج إضافة صنف جديد -->
+                <div id="productFormBlock" class="bg-white p-6 rounded-xl shadow-xs border border-gray-100 no-print">
+                    <div class="flex items-center space-x-2 space-x-reverse mb-6 border-b border-gray-50 pb-3">
+                        <span class="text-lg">📦</span>
+                        <h3 class="text-lg font-bold text-gray-700">تكويد صنف جديد بمستودع الأبواب</h3>
+                    </div>
+                    <form id="productForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">اسم الصنف الأساسي *</label>
+                            <input type="text" id="prodName" placeholder="باب WPC داخلي" class="w-full p-2.5 border border-gray-200 rounded-lg focus:outline-hidden">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">النوع / الخامة *</label>
+                            <input type="text" id="prodType" placeholder="خشب بلاستيكي" class="w-full p-2.5 border border-gray-200 rounded-lg focus:outline-hidden">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">اللون</label>
+                            <input type="text" id="prodColor" placeholder="بني محروق" class="w-full p-2.5 border border-gray-200 rounded-lg focus:outline-hidden">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">الكمية الافتتاحية</label>
+                            <input type="number" id="prodQty" value="100" class="w-full p-2.5 border border-gray-200 rounded-lg focus:outline-hidden">
+                        </div>
+                        <div class="md:col-span-4 flex items-center p-3 bg-slate-50 rounded-lg my-2">
+                            <input type="checkbox" id="hasDimensions" onchange="toggleDimensions()" class="w-4 h-4 text-amber-600">
+                            <label for="hasDimensions" class="mr-2 text-sm font-bold text-slate-700 cursor-pointer">هذا المنتج يتطلب أبعاد محددة (طول × عرض)</label>
+                        </div>
+                        <div id="dimensionsSection" class="hidden md:col-span-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/40 p-4 rounded-xl border border-amber-100">
+                            <div>
+                                <label class="block text-sm font-medium text-amber-800 mb-1">الطول (سم)</label>
+                                <input type="number" id="prodLength" step="0.1" placeholder="220" class="w-full p-2.5 bg-white border border-amber-200 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-amber-800 mb-1">العرض (سم)</label>
+                                <input type="number" id="prodWidth" step="0.1" placeholder="90" class="w-full p-2.5 bg-white border border-amber-200 rounded-lg">
+                            </div>
+                        </div>
+                        <div class="md:col-span-4 flex justify-end pt-2">
+                            <button type="button" onclick="saveProductLocally()" class="bg-slate-900 text-white font-bold px-6 py-2.5 rounded-lg hover:bg-slate-800 transition">💾 حفظ وتكويد الصنف</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- صندوق الأصناف المتوفرة -->
+                <div id="products-section" class="bg-white rounded-xl shadow-xs border border-gray-100 p-6">
+                    <div class="mb-4 border-b border-gray-50 pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div class="flex items-center space-x-2 space-x-reverse">
+                            <span class="text-lg">📦</span>
+                            <h3 class="text-lg font-bold text-gray-700">صندوق الأصناف بالمخزن (المتوفر الحالي)</h3>
+                        </div>
+                        <button onclick="printSection('products')" id="btnPrintProducts" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer no-print flex items-center gap-1">🖨️ طباعة قائمة الأصناف</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 text-sm font-bold border-b border-gray-100">
+                                    <th class="p-4">كود الصنف</th>
+                                    <th class="p-4">اسم المنتج الرسمي</th>
+                                    <th class="p-4">النوع</th>
+                                    <th class="p-4">اللون</th>
+                                    <th class="p-4" id="thStockColumn">الكمية المتوفرة</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productsTableBody" class="text-sm divide-y divide-gray-50">
+                                <tr><td colspan="5" class="p-8 text-center text-gray-400">لا توجد أصناف مسجلة أو لا تملك الصلاحية للرؤية.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- شاشة إضافة وتعديل بيانات العملاء التفاعلية -->
+                <div id="customerFormBlock" class="bg-white p-6 rounded-xl shadow-xs border border-gray-100 no-print">
+                    <div id="customers-section" class="flex items-center space-x-2 space-x-reverse mb-6 border-b border-gray-50 pb-3">
+                        <span class="text-lg">👥</span>
+                        <h3 id="customerFormTitle" class="text-lg font-bold text-gray-700">تسجيل عميل جديد واختيار المقاس والتركيب</h3>
+                    </div>
+
+                    <form id="customerForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <input type="hidden" id="editCustomerIndex" value="-1">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">اسم العميل *</label>
+                            <input type="text" id="custName" required placeholder="اسم العميل أو المؤسسة" class="w-full p-2.5 border border-gray-200 rounded-lg focus:outline-hidden">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">رقم الجوال *</label>
+                            <input type="tel" id="custPhone" required placeholder="05xxxxxxxx" class="w-full p-2.5 border border-gray-200 rounded-lg focus:outline-hidden text-right">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">الموقع / العنوان *</label>
+                            <input type="text" id="custLocation" required placeholder="المنطقة / الحي" class="w-full p-2.5 border border-gray-200 rounded-lg focus:outline-hidden">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">المندوب المسؤول *</label>
+                            <select id="custAgentSelect" required class="w-full p-2.5 border border-gray-200 rounded-lg bg-white focus:outline-hidden disabled:bg-gray-100 disabled:text-gray-500"></select>
+                        </div>
+                        <div class="bg-amber-50/50 p-3 rounded-lg border border-amber-100">
+                            <label class="block text-sm font-bold text-amber-900 mb-1">📐 تاريخ أخذ المقاس</label>
+                            <input type="date" id="custSurveyDate" class="w-full p-2 border border-amber-200 rounded-md bg-white">
+                        </div>
+                        <div class="bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                            <label class="block text-sm font-bold text-blue-900 mb-1">🛠️ موعد التركيب المتوقع</label>
+                            <input type="date" id="custInstallDate" class="w-full p-2 border border-blue-200 rounded-md bg-white">
+                        </div>
+                        <div class="md:col-span-2 bg-slate-50 p-3 rounded-lg border border-gray-200">
+                            <label class="block text-sm font-bold text-slate-700 mb-1">🗂️ إرفاق ملفات العميل (اختياري)</label>
+                            <input type="file" id="custFiles" multiple class="w-full text-xs text-slate-500 file:ml-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-amber-50 file:text-amber-700">
+                        </div>
+                        <div class="md:col-span-4 flex justify-end gap-2 pt-2">
+                            <button type="button" id="btnCancelEdit" onclick="cancelCustomerEdit()" class="hidden bg-gray-400 text-white font-bold px-4 py-2.5 rounded-lg hover:bg-gray-500">إلغاء التعديل</button>
+                            <button type="button" id="btnSubmitCustomer" onclick="saveCustomerLocally()" class="bg-emerald-600 text-white font-bold px-6 py-2.5 rounded-lg hover:bg-emerald-700 cursor-pointer">👥 حفظ بيانات العميل</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- دليل صندوق العملاء الخاضع للفلترة الصارمة للخصوصية -->
+                <div class="bg-white rounded-xl shadow-xs border border-gray-100 p-6">
+                    <div class="mb-4 border-b border-gray-50 pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div class="flex items-center space-x-2 space-x-reverse">
+                            <span class="text-lg">📋</span>
+                            <h3 id="tableCustomersTitle" class="text-lg font-bold text-gray-700">دليل العملاء والمتابعة</h3>
+                        </div>
+                        <button onclick="printSection('customers')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer no-print flex items-center gap-1">🖨️ طباعة قائمة العملاء</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 text-sm font-bold border-b border-gray-100">
+                                    <th class="p-4">كود العميل</th>
+                                    <th class="p-4">اسم العميل والاتصال</th>
+                                    <th class="p-4">المندوب</th>
+                                    <th class="p-4">المقاس والتركيب</th>
+                                    <th class="p-4">حالة التركيب 🛠️</th>
+                                    <th class="p-4">اعتماد المدير 👑</th>
+                                    <th class="p-4 text-center no-print">الملفات</th>
+                                    <th class="p-4 text-center no-print">إجراء</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customersTableBody" class="text-sm divide-y divide-gray-50">
+                                <tr><td colspan="8" class="p-8 text-center text-gray-400">لا يوجد عملاء مسجلين حالياً.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- شاشة إنشاء سند صرف جديد (متعدد الأصناف) -->
+                <div id="slipsFormBlock" class="bg-white p-6 rounded-xl shadow-xs border border-gray-100 no-print">
+                    <div id="slips-section" class="flex justify-between items-center mb-6 border-b border-gray-50 pb-3">
+                        <div class="flex items-center space-x-2 space-x-reverse">
+                            <span class="text-lg">📝</span>
+                            <h3 class="text-lg font-bold text-gray-700">إنشاء سند صرف مخزني جديد لعميل محدد (متعدد الأصناف)</h3>
+                        </div>
+                        <div class="text-sm font-bold bg-slate-100 text-slate-800 px-4 py-2 rounded-lg border border-slate-200">
+                            رقم السند التلقائي: <span id="currentSlipNumberLabel" class="text-amber-600 font-black">#1</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">أدخل كود العميل *</label>
+                            <div class="flex space-x-1 space-x-reverse">
+                                <input type="text" id="slipCustomerCode" placeholder="مثال: MSSK-501" class="w-full p-2.5 border border-gray-200 rounded-lg focus:outline-hidden font-bold">
+                                <button type="button" onclick="verifyCustomerCode()" class="bg-slate-900 text-white px-3 text-xs font-bold rounded-lg hover:bg-slate-800 cursor-pointer">🔍 تحقق</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">اسم العميل المتحقق منه</label>
+                            <input type="text" id="slipCustomerNameDisplay" disabled placeholder="يظهر تلقائياً هنا" class="w-full p-2.5 bg-slate-50 border border-gray-200 rounded-lg text-slate-500 font-bold">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-600 mb-1">تاريخ السند</label>
+                            <input type="date" id="slipDate" value="2026-07-09" class="w-full p-2.5 border border-gray-200 rounded-lg focus:outline-hidden">
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-xl border border-gray-200 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">اختر الصنف من المخزن</label>
+                                <select id="productSelect" class="w-full p-2.5 border border-gray-200 rounded-lg bg-white focus:outline-hidden"></select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-600 mb-1">الكمية المراد صرفها *</label>
+                                <input type="number" id="slipQty" min="1" value="1" class="w-full p-2.5 border border-gray-200 rounded-lg focus:outline-hidden">
+                            </div>
+                            <button type="button" onclick="addItemToCurrentSlip()" class="bg-amber-600 text-white font-bold p-2.5 rounded-lg hover:bg-amber-700 cursor-pointer">➕ إضافة للقائمة</button>
+                        </div>
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="w-full text-right bg-white rounded-lg border border-gray-200">
+                                <thead class="bg-slate-100 text-xs text-slate-700 font-bold">
+                                    <tr>
+                                        <th class="p-2">الصنف</th>
+                                        <th class="p-2">الكمية المطلوبة</th>
+                                        <th class="p-2 text-center">إجراء</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="temporaryItemsTableBody" class="text-xs divide-y divide-gray-100">
+                                    <tr><td colspan="3" class="p-4 text-center text-gray-400">لم يتم إضافة أي أصناف بعد.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="button" onclick="issueOutwardSlipLocally()" class="bg-slate-900 text-white font-bold px-8 py-3 rounded-lg hover:bg-slate-800 w-full md:w-auto cursor-pointer">✅ اعتماد وحفظ السند النهائي</button>
+                    </div>
+                </div>
+
+                <!-- سجل السندات الصادرة -->
+                <div id="slipsTableBlock" class="bg-white rounded-xl shadow-xs border border-gray-100 p-6">
+                    <div class="mb-4 border-b border-gray-50 pb-3 flex items-center space-x-2 space-x-reverse">
+                        <span class="text-lg">📋</span>
+                        <h3 class="text-lg font-bold text-gray-700">سجل حركات وسندات الصرف الصادرة للعملاء</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 text-sm font-bold border-b border-gray-100">
+                                    <th class="p-4">رقم السند</th>
+                                    <th class="p-4">التاريخ</th>
+                                    <th class="p-4">كود واسم العميل المستلم</th>
+                                    <th class="p-4">الأصناف والكميات</th>
+                                    <th class="p-4">الجهة المعتمدة</th>
+                                    <th class="p-4 text-center no-print">طباعة السند</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slipsTableBody" class="text-sm divide-y divide-gray-50">
+                                <tr><td colspan="6" class="p-8 text-center text-gray-400">لا توجد سجلات صرف صادرة.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="printArea" class="hidden"></div>
+
+    <script>
+        let productsList = [];
+        let customersList = [];
+        let slipsList = [];
+        let temporarySlipItems = [];
+        let nextSlipNumber = 1;
+        
+        let loggedInRole = "";      
+        let loggedInAgentName = ""; 
+
+        // مصفوفة الحسابات المشتركة وكلمات السر المحمية v9.0
+        let internalUsers = [
+            { id: "admin", name: "👤 المسؤول الرئيسي (الأدمن)", role: "admin", pass: "admin123" },
+            { id: "storekeeper", name: "🛠️ مصدر الصرف / أمين المستودع", role: "storekeeper", pass: "store123" },
+            { id: "agent-أحمد جابر", name: "👔 المندوب: أحمد جابر", role: "agent", agentName: "أحمد جابر", pass: "ahmed123" },
+            { id: "agent-محمد عسيري", name: "👔 المندوب: محمد عسيري", role: "agent", agentName: "محمد عسيري", pass: "mohammed123" },
+            { id: "agent-خالد يحيى", name: "👔 المندوب: خالد يحيى", role: "agent", agentName: "خالد يحيى", pass: "khaled123" }
+        ];
+
+        let globalCompanyLogo = "";
+
+        window.onload = function() {
+            rebuildLoginDropdown();
+        };
+
+        function rebuildLoginDropdown() {
+            const select = document.getElementById("loginRoleSelect");
+            if(select) {
+                select.innerHTML = "";
+                internalUsers.forEach(u => {
+                    select.innerHTML += `<option value="${u.id}">${u.name}</option>`;
+                });
+            }
+        }
+
+        function handleLoginRoleChange() {
+            document.getElementById("loginPassword").value = "";
+            document.getElementById("loginError").classList.add("hidden");
+        }
+
+        function attemptLogin() {
+            const idValue = document.getElementById("loginRoleSelect").value;
+            const passwordInput = document.getElementById("loginPassword").value;
+            const errorLabel = document.getElementById("loginError");
+
+            const targetUser = internalUsers.find(u => u.id === idValue);
+
+            if(targetUser && targetUser.pass === passwordInput) {
+                errorLabel.classList.add("hidden");
+                document.getElementById("loginScreen").classList.add("hidden");
+                document.getElementById("systemInterface").classList.remove("hidden");
+
+                loggedInRole = targetUser.role;
+                loggedInAgentName = targetUser.agentName || "";
+
+                applyRolePermissionsUI();
+            } else {
+                errorLabel.classList.remove("hidden");
+            }
+        }
+
+        function logoutSystem() {
+            document.getElementById("loginPassword").value = "";
+            document.getElementById("systemInterface").classList.add("hidden");
+            document.getElementById("loginScreen").classList.remove("hidden");
+        }
+
+        function applyRolePermissionsUI() {
+            const prodBlock = document.getElementById("productFormBlock");
+            const adminBlock = document.getElementById("usersAdminBlock");
+            const custBlock = document.getElementById("customerFormBlock");
+            const slipBlock = document.getElementById("slipsFormBlock");
+            const slipsTableBlock = document.getElementById("slipsTableBlock");
+            
+            const sideDash = document.getElementById("sideBtnDash");
+            const sideProd = document.getElementById("sideBtnProd");
+            const sideAgents = document.getElementById("sideBtnAgents");
+            const sideCust = document.getElementById("sideBtnCust");
+            const sideSlips = document.getElementById("sideBtnSlips");
+
+            [sideDash, sideProd, sideAgents, sideCust, sideSlips, prodBlock, adminBlock, custBlock, slipBlock, slipsTableBlock].forEach(b => b?.classList.remove("hidden"));
+
+            if(loggedInRole === "admin") {
+                document.getElementById("currentUserNameLabel").innerText = "المدير العام الرئيسي 👑";
+                document.getElementById("userBadgeSide").innerText = "لوحة المسؤول الرئيسي";
+                document.getElementById("customerCardTitle").innerText = "إجمالي كافة العملاء بالنظام";
+                document.getElementById("thStockColumn").classList.remove("hidden");
+                document.getElementById("btnPrintProducts").classList.remove("hidden");
+                document.getElementById("addUserFormBox").classList.remove("hidden");
+                
+                document.getElementById("custAgentSelect").disabled = false;
+                updateAgentsDropdown();
+                renderUsersAdminTable();
+            } 
+            else if(loggedInRole === "sub_admin") {
+                document.getElementById("currentUserNameLabel").innerText = "الأدمن المساعد 🔑";
+                document.getElementById("userBadgeSide").innerText = "إشراف ومتابعة محدودة";
+                document.getElementById("customerCardTitle").innerText = "إجمالي كافة العملاء بالنظام";
+                document.getElementById("thStockColumn").classList.remove("hidden");
+                document.getElementById("btnPrintProducts").classList.remove("hidden");
+                
+                document.getElementById("addUserFormBox").classList.add("hidden");
+                prodBlock.classList.add("hidden");
+                
+                document.getElementById("custAgentSelect").disabled = false;
+                updateAgentsDropdown();
+                renderUsersAdminTable();
+            }
+            else if(loggedInRole === "storekeeper") {
+                document.getElementById("currentUserNameLabel").innerText = "أمين المستودع ومصدر الصرف 🛠️";
+                document.getElementById("userBadgeSide").innerText = "مستودع الأبواب";
+                document.getElementById("customerCardTitle").innerText = "إجمالي كافة العملاء بالنظام";
+                document.getElementById("thStockColumn").classList.remove("hidden");
+                document.getElementById("btnPrintProducts").classList.remove("hidden");
+                
+                prodBlock.classList.add("hidden");
+                adminBlock.classList.add("hidden");
+                custBlock.classList.add("hidden");
+                sideAgents.classList.add("hidden");
+            } 
+            else if(loggedInRole === "agent") {
+                document.getElementById("currentUserNameLabel").innerText = `المندوب الميداني: [ ${loggedInAgentName} ] 👔`;
+                document.getElementById("userBadgeSide").innerText = `حساب: ${loggedInAgentName}`;
+                document.getElementById("customerCardTitle").innerText = "إجمالي عملائي المسجلين باسمي";
+                
+                document.getElementById("thStockColumn").classList.add("hidden");
+                document.getElementById("btnPrintProducts").classList.add("hidden");
+
+                prodBlock.classList.add("hidden");
+                adminBlock.classList.add("hidden");
+                slipBlock.classList.add("hidden");
+                slipsTableBlock.classList.add("hidden");
+                
+                sideProd.classList.add("hidden");
+                sideAgents.classList.add("hidden");
+                sideSlips.classList.add("hidden");
+
+                const select = document.getElementById("custAgentSelect");
+                select.innerHTML = `<option value="${loggedInAgentName}">${loggedInAgentName}</option>`;
+                select.disabled = true;
+            }
+
+            updateProductsUI();
+            updateCustomersUI();
+            updateSlipsUI();
+        }
+
+        function renderUsersAdminTable() {
+            const tbody = document.getElementById("usersAdminTableBody");
+            if(!tbody) return;
+            tbody.innerHTML = "";
+
+            internalUsers.forEach((u, idx) => {
+                let passField = "";
+                if(loggedInRole === "sub_admin" && u.role === "admin") {
+                    passField = `<span class="text-gray-400 italic text-xs">******** (محمي للمالك)</span>`;
+                } else {
+                    passField = `<input type="text" value="${u.pass}" onchange="updateUserPasswordLocally(${idx}, this.value)" class="p-1.5 border border-gray-200 rounded-md text-sm font-mono w-32">`;
+                }
+
+                let actionsCell = "";
+                if(u.role === "admin") {
+                    actionsCell = `<span class="text-xs text-gray-400">حساب مالك محمي</span>`;
+                } else if(loggedInRole === "sub_admin") {
+                    actionsCell = `<span class="text-xs text-red-500">غير مصرح للمساعد بالحذف</span>`;
+                } else {
+                    actionsCell = `<button onclick="deleteUserLocally(${idx})" class="bg-red-500 text-white text-xs px-2 py-1 rounded-md hover:bg-red-600 transition">❌ حذف</button>`;
+                }
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="p-4 font-bold text-slate-700">${u.name}</td>
+                        <td class="p-4 text-xs font-semibold text-amber-700">${u.role === "admin" ? "مسؤول رئيسي" : (u.role === "sub_admin" ? "أدمن مساعد" : (u.role === "storekeeper" ? "أمين مستودع" : "مندوب مبيعات"))}</td>
+                        <td class="p-4">${passField}</td>
+                        <td class="p-4 text-center">${actionsCell}</td>
+                    </tr>`;
+            });
+        }
+
+        function addNewUserFromAdmin() {
+            if(loggedInRole !== "admin") return;
+            const name = document.getElementById("newUserName").value.trim();
+            const password = document.getElementById("newUserPass").value.trim();
+            const role = document.getElementById("newUserRole").value;
+
+            if(!name || !password) { alert("الرجاء تعبئة الاسم والرقم السري المخصص!"); return; }
+
+            const newId = role === "agent" ? `agent-${name}` : `user_${Date.now()}`;
+            let prefix = role === "agent" ? "👔 المندوب: " : (role === "storekeeper" ? "🛠️ " : "🔑 ");
+
+            internalUsers.push({
+                id: newId,
+                name: prefix + name,
+                role: role,
+                agentName: role === "agent" ? name : "",
+                pass: password
+            });
+
+            alert("🎉 تم إضافة الموظف الجديد للنظام ومنحه صلاحية الدخول فوراً!");
+            document.getElementById("newUserName").value = "";
+            document.getElementById("newUserPass").value = "";
+            
+            rebuildLoginDropdown();
+            renderUsersAdminTable();
+            applyRolePermissionsUI();
+        }
+
+        function deleteUserLocally(idx) {
+            if(loggedInRole !== "admin") return;
+            if(confirm("هل أنت متأكد من حذف هذا الحساب وسحب صلاحيات الدخول؟")) {
+                internalUsers.splice(idx, 1);
+                rebuildLoginDropdown();
+                renderUsersAdminTable();
+            }
+        }
+
+        function updateUserPasswordLocally(idx, newPass) {
+            if(newPass.trim() === "") return;
+            internalUsers[idx].pass = newPass.trim();
+            alert(`✅ تم تحديث الرقم السري بنجاح لـ: ${internalUsers[idx].name}`);
+        }
+
+        function loadCompanyLogo(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    globalCompanyLogo = e.target.result;
+                    document.getElementById("sidebarLogo").src = globalCompanyLogo;
+                    document.getElementById("sidebarLogoContainer").classList.replace("hidden", "flex");
+                    document.getElementById("headerLogo").src = globalCompanyLogo;
+                    document.getElementById("headerLogoContainer").classList.remove("hidden");
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function toggleDimensions() {
+            const checkBox = document.getElementById("hasDimensions");
+            document.getElementById("dimensionsSection").classList.toggle("hidden", !checkBox.checked);
+        }
+
+        function scrollToSection(id) {
+            const element = document.getElementById(id);
+            if (element) element.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function updateAgentsDropdown() {
+            const select = document.getElementById("custAgentSelect");
+            if(select) {
+                select.innerHTML = '<option value="">-- اختر المندوب --</option>';
+                internalUsers.forEach(u => {
+                    if(u.role === "agent") {
+                        select.innerHTML += `<option value="${u.agentName}">${u.agentName}</option>`;
+                    }
+                });
+            }
+        }
+
+        function saveProductLocally() {
+            const name = document.getElementById("prodName").value.trim();
+            const type = document.getElementById("prodType").value.trim();
+            const color = document.getElementById("prodColor").value.trim() || "-";
+            const qty = parseInt(document.getElementById("prodQty").value) || 0;
+            const hasDims = document.getElementById("hasDimensions").checked;
+            let length = document.getElementById("prodLength").value;
+            let width = document.getElementById("prodWidth").value;
+
+            if (!name || !type) { alert("الرجاء إدخال اسم الصنف ونوعه!"); return; }
+            let finalName = name;
+            if (hasDims && length && width) finalName = `${name} (${length}×${width} سم)`;
+
+            productsList.push({
+                id: `PRD-${100 + productsList.length + 1}`,
+                fullName: finalName,
+                type: type,
+                color: color,
+                stock: qty
+            });
+            updateProductsUI();
+            alert(`🎉 تم تكويد الصنف بنجاح!`);
+            document.getElementById("productForm").reset();
+            if (hasDims) document.getElementById("hasDimensions").click();
+        }
+
+        function updateProductsUI() {
+            document.getElementById("totalProductsCount").innerText = `${productsList.length} صنف`;
+            const tbody = document.getElementById("productsTableBody");
+            tbody.innerHTML = "";
+            const selectDropdown = document.getElementById("productSelect");
+            selectDropdown.innerHTML = '<option value="">-- اختر من الأصناف المسجلة --</option>';
+
+            productsList.forEach((prod, index) => {
+                let stockCell = (loggedInRole === "agent") ? "" : `<td class="p-4"><span class="bg-blue-50 text-blue-700 px-3 py-1 rounded-sm font-bold">${prod.stock} حبة</span></td>`;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50/80 transition">
+                        <td class="p-4 font-bold text-slate-700">${prod.id}</td>
+                        <td class="p-4 font-bold text-amber-700">${prod.fullName}</td>
+                        <td class="p-4 text-slate-600">${prod.type}</td>
+                        <td class="p-4 text-slate-600">${prod.color}</td>
+                        ${stockCell}
+                    </tr>`;
+                
+                const opt = document.createElement("option");
+                opt.value = index;
+                opt.text = `${prod.fullName} [المتوفر: ${prod.stock}]`;
+                selectDropdown.add(opt);
+            });
+        }
+
+        async function saveCustomerLocally() {
+            const name = document.getElementById("custName").value.trim();
+            const phone = document.getElementById("custPhone").value.trim();
+            const location = document.getElementById("custLocation").value.trim();
+            const agent = (loggedInRole === "agent") ? loggedInAgentName : document.getElementById("custAgentSelect").value;
+            
+            const surveyDate = document.getElementById("custSurveyDate").value || "";
+            const installDate = document.getElementById("custInstallDate").value || "";
+            const fileInput = document.getElementById("custFiles");
+            const editIndex = parseInt(document.getElementById("editCustomerIndex").value);
+
+            if (!name || !phone || !location || !agent) {
+                alert("الرجاء ملء كافة الحقول الإلزامية للعميل!");
+                return;
+            }
+
+            let attachments = [];
+            if (fileInput.files.length > 0) {
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    let fileObj = fileInput.files[i];
+                    let base64Data = await readAsBase64(fileObj);
+                    attachments.push({ name: fileObj.name, data: base64Data });
+                }
+            }
+
+            if(editIndex > -1) {
+                customersList[editIndex].name = name;
+                customersList[editIndex].phone = phone;
+                customersList[editIndex].location = location;
+                customersList[editIndex].surveyDate = surveyDate || "لم يحدد";
+                customersList[editIndex].installDate = installDate || "لم يحدد";
+                if(attachments.length > 0) {
+                    customersList[editIndex].files = [...customersList[editIndex].files, ...attachments];
+                }
+                alert(`✏️ تم تحديث بيانات العميل بنجاح!`);
+                cancelCustomerEdit();
+            } else {
+                customersList.push({
+                    id: `MSSK-${500 + customersList.length + 1}`,
+                    name: name,
+                    phone: phone,
+                    location: location,
+                    agent: agent,
+                    surveyDate: surveyDate || "لم يحدد",
+                    installDate: installDate || "لم يحدد",
+                    isInstalled: false,
+                    isApproved: false,
+                    files: attachments
+                });
+                alert(`🎉 تم تسجيل وحفظ العميل الجديد بنجاح!`);
+                document.getElementById("customerForm").reset();
+            }
+
+            if(loggedInRole === "agent") {
+                document.getElementById("custAgentSelect").value = loggedInAgentName;
+                document.getElementById("custAgentSelect").disabled = true;
+            }
+
+            updateCustomersUI();
+            checkUpcomingInstallations();
+        }
+
+        function editCustomerData(index) {
+            const cust = customersList[index];
+            document.getElementById("editCustomerIndex").value = index;
+            document.getElementById("custName").value = cust.name;
+            document.getElementById("custPhone").value = cust.phone;
+            document.getElementById("custLocation").value = cust.location;
+            document.getElementById("custAgentSelect").value = cust.agent;
+            document.getElementById("custSurveyDate").value = cust.surveyDate === "لم يحدد" ? "" : cust.surveyDate;
+            document.getElementById("custInstallDate").value = cust.installDate === "لم يحدد" ? "" : cust.installDate;
+
+            document.getElementById("customerFormTitle").innerText = `✏️ تعديل بيانات العميل الحالي: ${cust.id}`;
+            document.getElementById("btnSubmitCustomer").innerText = `💾 حفظ التعديلات الحالية`;
+            document.getElementById("btnCancelEdit").classList.remove("hidden");
+            
+            scrollToSection('customerFormBlock');
+        }
+
+        function cancelCustomerEdit() {
+            document.getElementById("editCustomerIndex").value = "-1";
+            document.getElementById("customerForm").reset();
+            document.getElementById("customerFormTitle").innerText = "تسجيل عميل جديد واختيار المقاس والتركيب";
+            document.getElementById("btnSubmitCustomer").innerText = "👥 حفظ بيانات العميل";
+            document.getElementById("btnCancelEdit").classList.add("hidden");
+            if(loggedInRole === "agent") {
+                document.getElementById("custAgentSelect").value = loggedInAgentName;
+                document.getElementById("custAgentSelect").disabled = true;
+            }
+        }
+
+        function readAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function updateCustomersUI() {
+            const tbody = document.getElementById("customersTableBody");
+            tbody.innerHTML = "";
+
+            let filteredCustomers = customersList;
+            if (loggedInRole === "agent") {
+                filteredCustomers = customersList.filter(c => c.agent === loggedInAgentName);
+                document.getElementById("tableCustomersTitle").innerText = `دليل العملاء المسجلين باسم المندوب: ( ${loggedInAgentName} )`;
+            } else {
+                document.getElementById("tableCustomersTitle").innerText = "دليل كافة العملاء والمتابعة والاعتمادات العامة";
+            }
+
+            document.getElementById("totalCustomersCount").innerText = `${filteredCustomers.length} عميل`;
+
+            if(filteredCustomers.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-400">لا توجد سجلات عملاء متاحة للعرض في حسابك حالياً.</td></tr>`;
+                return;
+            }
+
+            filteredCustomers.forEach((cust) => {
+                let realIndex = customersList.findIndex(c => c.id === cust.id);
+
+                let filesHtml = "";
+                if (cust.files && cust.files.length > 0) {
+                    cust.files.forEach(f => {
+                        filesHtml += `<div class="mb-1"><a href="${f.data}" download="${f.name}" class="text-blue-600 font-bold underline text-xs block">📥 تحميل: ${f.name}</a></div>`;
+                    });
+                } else { filesHtml = `<span class="text-gray-400 text-xs">لا يوجد</span>`; }
+
+                let installedChecked = cust.isInstalled ? 'checked' : '';
+                let disabledForStorekeeper = (loggedInRole === 'storekeeper') ? 'disabled' : '';
+                let installStatusCell = `
+                    <div class="flex items-center space-x-1 space-x-reverse">
+                        <input type="checkbox" ${installedChecked} ${disabledForStorekeeper} onchange="toggleInstallStatus(${realIndex})" class="w-4 h-4 text-emerald-600 rounded-sm cursor-pointer">
+                        <span class="${cust.isInstalled ? 'text-emerald-600 font-bold' : 'text-gray-400'} text-xs">${cust.isInstalled ? 'تم التركيب ✓' : 'قيد الانتظار'}</span>
+                    </div>`;
+
+                let approvalButtonHtml = "";
+                if (cust.isApproved) {
+                    approvalButtonHtml = `<span class="bg-emerald-100 text-emerald-800 font-black text-xs px-3 py-1 rounded-md border border-emerald-300">👑 معتمد</span>`;
+                } else {
+                    if (loggedInRole === 'admin') {
+                        approvalButtonHtml = `<button onclick="approveCustomerByAdmin(${realIndex})" class="bg-slate-900 text-white text-xs font-bold px-2.5 py-1.5 rounded-md hover:bg-amber-600 cursor-pointer">✅ اعتماد</button>`;
+                    } else { approvalButtonHtml = `<span class="text-gray-400 text-xs">بانتظار المدير 🔒</span>`; }
+                }
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50/80 transition">
+                        <td class="p-4 font-black text-emerald-700">${cust.id}</td>
+                        <td class="p-4">
+                            <div class="font-bold text-slate-800">${cust.name}</div>
+                            <div class="text-xs text-gray-500">${cust.phone} | ${cust.location}</div>
+                        </td>
+                        <td class="p-4 font-semibold text-amber-700">${cust.agent}</td>
+                        <td class="p-4 text-xs">
+                            <div>📐 مقاس: <span class="font-medium text-slate-700">${cust.surveyDate}</span></div>
+                            <div class="mt-0.5">🛠️ تركيب: <span class="font-medium text-blue-700">${cust.installDate}</span></div>
+                        </td>
+                        <td class="p-4">${installStatusCell}</td>
+                        <td class="p-4 text-center">${approvalButtonHtml}</td>
+                        <td class="p-4 no-print">${filesHtml}</td>
+                        <td class="p-4 text-center no-print">
+                            <button onclick="editCustomerData(${realIndex})" class="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs px-3 py-1.5 rounded-md transition cursor-pointer">✏️ تعديل</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function verifyCustomerCode() {
+            const codeInput = document.getElementById("slipCustomerCode").value.trim().toUpperCase();
+            const displayInput = document.getElementById("slipCustomerNameDisplay");
+            if(!codeInput) { alert("الرجاء إدخال كود العميل أولاً!"); return; }
+            const customer = customersList.find(c => c.id.toUpperCase() === codeInput);
+            if(customer) { displayInput.value = customer.name; } 
+            else { displayInput.value = ""; alert("❌ كود العميل غير موجود بنظام مبيعات MSSK!"); }
+        }
+
+        function addItemToCurrentSlip() {
+            const productIndex = document.getElementById("productSelect").value;
+            const qtyToSpend = parseInt(document.getElementById("slipQty").value) || 0;
+            if (productIndex === "") { alert("الرجاء اختيار صنف من المخزن!"); return; }
+            if (qtyToSpend <= 0) { alert("الرجاء إدخال كمية صحيحة!"); return; }
+
+            const targetProduct = productsList[productIndex];
+            let existingItem = temporarySlipItems.find(item => item.productObj.id === targetProduct.id);
+            let totalRequested = qtyToSpend + (existingItem ? existingItem.qty : 0);
+
+            if (targetProduct.stock < totalRequested) { 
+                alert(`خطأ: المخزون غير كافٍ! المتوفر الحالي: ${targetProduct.stock}`); 
+                return; 
+            }
+
+            if (existingItem) { existingItem.qty = totalRequested; } 
+            else { temporarySlipItems.push({ productObj: targetProduct, qty: qtyToSpend }); }
+            updateTemporaryItemsTable();
+            document.getElementById("slipQty").value = "1";
+        }
+
+        function deleteTempItem(index) {
+            temporarySlipItems.splice(index, 1);
+            updateTemporaryItemsTable();
+        }
+
+        function updateTemporaryItemsTable() {
+            const tbody = document.getElementById("temporaryItemsTableBody");
+            tbody.innerHTML = "";
+            if(temporarySlipItems.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400">لم يتم إضافة أي أصناف بعد.</td></tr>`;
+                return;
+            }
+            temporarySlipItems.forEach((item, index) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="p-2 font-bold text-slate-700">${item.productObj.fullName}</td>
+                        <td class="p-2 font-bold text-amber-600">${item.qty} حبة</td>
+                        <td class="p-2 text-center">
+                            <button onclick="deleteTempItem(${index})" class="text-red-500 hover:text-red-700 font-bold cursor-pointer">❌ حذف</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function toggleInstallStatus(index) {
+            if (loggedInRole === 'storekeeper') return;
+            customersList[index].isInstalled = !customersList[index].isInstalled;
+            updateCustomersUI();
+        }
+
+        function approveCustomerByAdmin(index) {
+            if (loggedInRole !== 'admin') return;
+            customersList[index].isApproved = true;
+            updateCustomersUI();
+            alert(`👑 تم اعتماد ملف العميل رسمياً!`);
+        }
+
+        function checkUpcomingInstallations() {
+            const container = document.getElementById("installationAlertsContainer");
+            container.innerHTML = "";
+            let hasAlerts = false;
+            const today = new Date(); today.setHours(0,0,0,0);
+
+            let relevantCustomers = (loggedInRole === "agent") ? customersList.filter(c => c.agent === loggedInAgentName) : customersList;
+
+            relevantCustomers.forEach(cust => {
+                if (!cust.installDate || cust.installDate === "لم يحدد") return;
+                const targetDate = new Date(cust.installDate); if (isNaN(targetDate)) return;
+                targetDate.setHours(0,0,0,0);
+                const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
+
+                if (diffDays >= 0 && diffDays <= 2) {
+                    hasAlerts = true;
+                    let message = diffDays === 0 ? `🚨 اليوم موعد تركيب العميل (${cust.name})` : (diffDays === 1 ? `⚠️ غداً موعد تركيب العميل (${cust.name})` : `⏰ متبقي يومان على تركيب العميل (${cust.name})`);
+                    container.innerHTML += `
+                        <div class="bg-red-50 border-r-4 border-red-600 p-4 rounded-l-xl text-red-900 text-sm font-bold flex items-center justify-between shadow-xs animate-pulse-light">
+                            <span>📅 ${message} [الموقع: ${cust.location}]</span>
+                            <span class="bg-red-600 text-white text-xs px-2.5 py-0.5 rounded-sm">التاريخ: ${cust.installDate}</span>
+                        </div>`;
+                }
+            });
+            container.classList.toggle("hidden", !hasAlerts);
+        }
+
+        function issueOutwardSlipLocally() {
+            const codeInput = document.getElementById("slipCustomerCode").value.trim().toUpperCase();
+            const customerName = document.getElementById("slipCustomerNameDisplay").value;
+            const date = document.getElementById("slipDate").value;
+
+            if (!codeInput || !customerName) { alert("الرجاء التحقق من كود العميل أولاً!"); return; }
+            if (temporarySlipItems.length === 0) { alert("خطأ: يرجى إضافة صنف واحد على الأقل داخل قائمة السند!"); return; }
+
+            temporarySlipItems.forEach(item => { item.productObj.stock -= item.qty; });
+            
+            let actualIssuer = (loggedInRole === "admin") ? "المسؤول الرئيسي (الأدمن)" : "أمين المستودع (مصدر الصرف)";
+
+            slipsList.push({
+                number: nextSlipNumber,
+                date: date,
+                customerInfo: `${codeInput} - ${customerName}`,
+                items: [...temporarySlipItems],
+                issuer: actualIssuer
+            });
+            
+            alert(`✅ تم اعتماد السند المخزني #${nextSlipNumber} بنجاح!`);
+            nextSlipNumber++;
+            temporarySlipItems = [];
+            updateProductsUI();
+            updateTemporaryItemsTable();
+            updateSlipsUI();
+            document.getElementById("slipCustomerCode").value = "";
+            document.getElementById("slipCustomerNameDisplay").value = "";
+        }
+
+        function updateSlipsUI() {
+            document.getElementById("totalSlipsCount").innerText = `${slipsList.length} سند`;
+            document.getElementById("currentSlipNumberLabel").innerText = `#${nextSlipNumber}`;
+            const tbody = document.getElementById("slipsTableBody");
+            if(!tbody) return;
+            tbody.innerHTML = "";
+
+            if(slipsList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-400">لا توجد سجلات صرف صادرة حتى الآن.</td></tr>`;
+                return;
+            }
+
+            slipsList.forEach((slip, index) => {
+                let itemsDescHtml = "";
+                slip.items.forEach(it => {
+                    itemsDescHtml += `<div class="text-xs text-slate-700 font-medium">• ${it.productObj.fullName} (<span class="text-red-600 font-bold">${it.qty} حبة</span>)</div>`;
+                });
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50/80 transition">
+                        <td class="p-4 font-black text-amber-600">#${slip.number}</td>
+                        <td class="p-4 text-slate-600">${slip.date}</td>
+                        <td class="p-4 font-bold text-emerald-800">${slip.customerInfo}</td>
+                        <td class="p-4">${itemsDescHtml}</td>
+                        <td class="p-4"><span class="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">${slip.issuer}</span></td>
+                        <td class="p-4 text-center no-print">
+                            <button onclick="printSlipInvoice(${index})" class="bg-slate-900 text-white font-bold text-xs px-3 py-1.5 rounded-md hover:bg-amber-600 transition cursor-pointer">🖨️ طباعة السند</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function printSection(sectionType) {
+            const printArea = document.getElementById("printArea");
+            printArea.innerHTML = "";
+            let logoHtml = globalCompanyLogo ? `<img src="${globalCompanyLogo}" style="height:60px; max-width:180px; object-contain; margin-bottom:10px;">` : '';
+
+            if (sectionType === 'products') {
+                let rowsHtml = "";
+                productsList.forEach(prod => {
+                    rowsHtml += `
+                        <tr>
+                            <td style="padding:10px; border:1px solid #000;">${prod.id}</td>
+                            <td style="padding:10px; border:1px solid #000; font-weight:bold;">${prod.fullName}</td>
+                            <td style="padding:10px; border:1px solid #000;">${prod.type}</td>
+                            <td style="padding:10px; border:1px solid #000;">${prod.color}</td>
+                            <td style="padding:10px; border:1px solid #000; font-weight:bold;">${prod.stock} حبة</td>
+                        </tr>`;
+                });
+
+                printArea.innerHTML = `
+                    <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; font-family:sans-serif;">
+                        ${logoHtml}
+                        <h1 style="font-size: 24px; font-weight: bold; color: #d97706; margin:5px 0;">شركة مسك السكن للتجارة (MSSK Doors)</h1>
+                        <h2 style="font-size: 18px; font-weight: bold; margin-top: 5px;">تقرير جرد وإحصاء الأصناف المتوفرة بالمستودع</h2>
+                        <p style="font-size: 12px; margin-top: 5px;">تاريخ التقرير: 2026-07-09</p>
+                    </div>
+                    <table style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:14px;">
+                        <thead>
+                            <tr style="background-color:#f1f5f9;">
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">كود الصنف</th>
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">اسم المنتج الرسمي</th>
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">النوع</th>
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">اللون</th>
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">الكمية المتوفرة</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>`;
+            } 
+            else if (sectionType === 'customers') {
+                let filteredCustomers = (loggedInRole === "agent") ? customersList.filter(c => c.agent === loggedInAgentName) : customersList;
+                let rowsHtml = "";
+                
+                filteredCustomers.forEach(cust => {
+                    rowsHtml += `
+                        <tr>
+                            <td style="padding:10px; border:1px solid #000; font-weight:bold;">${cust.id}</td>
+                            <td style="padding:10px; border:1px solid #000;">
+                                <strong>${cust.name}</strong><br><span style="font-size:11px; color:#555;">${cust.phone} | ${cust.location}</span>
+                            </td>
+                            <td style="padding:10px; border:1px solid #000; font-weight:bold;">${cust.agent}</td>
+                            <td style="padding:10px; border:1px solid #000; font-size:12px;">
+                                مقاس: ${cust.surveyDate}<br>تركيب: ${cust.installDate}
+                            </td>
+                            <td style="padding:10px; border:1px solid #000;">${cust.isInstalled ? 'تم التركيب ✓' : 'قيد الانتظار'}</td>
+                            <td style="padding:10px; border:1px solid #000;">${cust.isApproved ? 'معتمد' : 'بانتظار المدير'}</td>
+                        </tr>`;
+                });
+
+                printArea.innerHTML = `
+                    <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; font-family:sans-serif;">
+                        ${logoHtml}
+                        <h1 style="font-size: 24px; font-weight: bold; color: #059669; margin:5px 0;">شركة مسك السكن للتجارة (MSSK Doors)</h1>
+                        <h2 style="font-size: 18px; font-weight: bold; margin-top: 5px;">كشف وصندوق متابعة العملاء المطبوع</h2>
+                        <p style="font-size: 11px; margin-top: 5px;">الحساب المصدر للتقرير: ${loggedInAgentName || 'الإدارة العامة'}</p>
+                    </div>
+                    <table style="width:100%; border-collapse:collapse; border:1px solid #000; font-size:13px;">
+                        <thead>
+                            <tr style="background-color:#f1f5f9;">
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">كود العميل</th>
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">اسم العميل والاتصال</th>
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">المندوب</th>
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">المقاس والتركيب</th>
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">الحالة</th>
+                                <th style="padding:10px; border:1px solid #000; text-align:right;">الاعتماد</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>`;
+            }
+
+            window.print();
+        }
+
+        function printSlipInvoice(index) {
+            const slip = slipsList[index];
+            const printArea = document.getElementById("printArea");
+            printArea.innerHTML = "";
+
+            let rowsHtml = "";
+            slip.items.forEach((it, i) => {
+                rowsHtml += `
+                    <tr style="border-bottom: 1px solid #000; text-align: right;">
+                        <td style="padding: 10px; border: 1px solid #000;">${i+1}</td>
+                        <td style="padding: 10px; border: 1px solid #000; font-weight: bold;">${it.productObj.fullName}</td>
+                        <td style="padding: 10px; border: 1px solid #000;">${it.productObj.type}</td>
+                        <td style="padding: 10px; border: 1px solid #000; font-weight: bold; color: red;">${it.qty} حبة</td>
+                    </tr>`;
+            });
+
+            let logoHtml = globalCompanyLogo ? `<img src="${globalCompanyLogo}" style="height:65px; max-width:180px; object-contain;">` : '<div style="font-size:24px; font-weight:black; color:#d97706;">MSSK</div>';
+
+            printArea.innerHTML = `
+                <div style="border: 2px solid #000; padding: 20px; font-family: sans-serif; direction: rtl;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px;">
+                        <div style="text-align: right; width: 60%;">
+                            ${logoHtml}
+                            <h1 style="font-size: 20px; font-weight: black; margin: 5px 0 0 0; color: #d97706;">شركة مسك السكن للتجارة</h1>
+                            <p style="font-size: 12px; margin: 3px 0; color: #555;">أبواب وخامات Wood Plastic Composite (WPC)</p>
+                        </div>
+                        <div style="text-align: left; width: 40%;">
+                            <h2 style="font-size: 20px; font-weight: bold; margin: 0;">سند صرف مخزني رسمي</h2>
+                            <p style="font-size: 14px; margin: 5px 0; font-weight: bold;">رقم السند: <span style="color:red;">#${slip.number}</span></p>
+                            <p style="font-size: 12px; margin: 0;">التاريخ: ${slip.date}</p>
+                        </div>
+                    </div>
+                    <div style="background-color: #f8fafc; border: 1px solid #000; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                        <p style="margin: 0; font-size: 14px; font-weight: bold;">جهة وصاحب استلام الإرسالية:</p>
+                        <h3 style="margin: 5px 0 0 0; font-size: 16px; color: #1e293b; font-weight: black;">${slip.customerInfo}</h3>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 30px;">
+                        <thead>
+                            <tr style="background-color: #f1f5f9; border-bottom: 2px solid #000; text-align: right; font-size: 14px;">
+                                <th style="padding: 10px; border: 1px solid #000; width: 10%;">م</th>
+                                <th style="padding: 10px; border: 1px solid #000; width: 50%;">بيان المنتج الرسمي ومقاساته</th>
+                                <th style="padding: 10px; border: 1px solid #000; width: 20%;">النوع / الخامة</th>
+                                <th style="padding: 10px; border: 1px solid #000; width: 20%;">الكمية المنصرفة</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 13px;">${rowsHtml}</tbody>
+                    </table>
+                    <div style="display: flex; margin-top: 50px; justify-content: space-between; font-size: 14px;">
+                        <div style="text-align: center; width: 30%;">
+                            <p style="margin-bottom: 40px; font-weight: bold;">منشئ ومصدر السند</p>
+                            <p style="font-size:11px; font-weight:bold; color:#555;">(${slip.issuer})</p>
+                            <p style="border-top: 1px dashed #000; width: 100%; margin-top: 5px;"></p>
+                        </div>
+                        <div style="text-align: center; width: 30%;">
+                            <p style="margin-bottom: 40px; font-weight: bold;">أمين المستودع (المخزن)</p>
+                            <p style="border-top: 1px dashed #000; width: 100%; margin-top: 25px;"></p>
+                        </div>
+                        <div style="text-align: center; width: 30%;">
+                            <p style="margin-bottom: 40px; font-weight: bold;">توقيع العميل / المندوب المستلم</p>
+                            <p style="border-top: 1px dashed #000; width: 100%; margin-top: 25px;"></p>
+                        </div>
+                    </div>
+                </div>`;
+
+            window.print();
+        }
+    </script>
+</body>
+</html>
